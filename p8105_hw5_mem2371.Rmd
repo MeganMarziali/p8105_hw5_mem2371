@@ -7,4 +7,40 @@ output: github_document
 ```{r}
 library(tidyverse)
 library(rvest)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_color_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
 ```
+
+## Problem 1
+
+```{r}
+homicides_df = 
+  read_csv("./data/homicides.csv",
+           na = "") %>% 
+  janitor::clean_names() %>% 
+  mutate(
+    city_state = paste(city, state),
+    date = as.Date(paste(reported_date, "01", sep = ""), "%Y%m%d")
+  ) %>% 
+  select(-reported_date)
+
+min(homicides_df$victim_age)
+```
+
+The Washington Post data on homicides in 50 large US cities contains `r nrow(homicides_df)` rows and `r ncol(homicides_df)` variables (including the city_state and new date variables, which has been constructed in the above code). The data contains important information regarding homicides, such as the victim's first and last name, race, age, sex, location of incident (including city and state), and the status of the case.
+
+The age of victims ranges from `
