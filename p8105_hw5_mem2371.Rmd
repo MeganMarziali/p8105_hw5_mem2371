@@ -27,20 +27,91 @@ scale_fill_discrete = scale_fill_viridis_d
 
 ## Problem 1
 
+Read in the data.
+
 ```{r}
 homicides_df = 
   read_csv("./data/homicides.csv",
            na = "") %>% 
   janitor::clean_names() %>% 
   mutate(
-    city_state = paste(city, state),
+    resolved = case_when(
+      disposition == "Closed without arrest" ~ "unsolved",
+      disposition == "Open/No arrest" ~ "unsolved",
+      disposition == "Closed by arrest" ~ "solved"
+      ),
+    city_state = str_c(city, state, sep = "_"),
     date = as.Date(paste(reported_date, "01", sep = ""), "%Y%m%d")
   ) %>% 
-  select(-reported_date)
-
-min(homicides_df$victim_age)
+  select(city_state, resolved) %>% 
+  filter(city_state != "Tulsa_AL")
 ```
 
 The Washington Post data on homicides in 50 large US cities contains `r nrow(homicides_df)` rows and `r ncol(homicides_df)` variables (including the city_state and new date variables, which has been constructed in the above code). The data contains important information regarding homicides, such as the victim's first and last name, race, age, sex, location of incident (including city and state), and the status of the case.
 
-The age of victims ranges from `
+Let's look at this a bit
+
+```{r}
+aggregate_df = 
+  homicides_df %>% 
+  group_by(city_state) %>% 
+  summarize(
+    hom_total = n(),
+    hom_unsolved = sum(resolved == "unsolved")
+  )
+```
+
+Can I do a prop test for a single city?
+
+```{r}
+prop.test(
+  aggregate_df %>% filter(city_state == "Baltimore_MD") %>%  pull(hom_unsolved),
+  aggregate_df %>% filter(city_state == "Baltimore_MD") %>%  pull(hom_total)) %>% 
+  broom::tidy()
+```
+
+Try to iterate ...
+
+```{r}
+results_df = 
+  aggregate_df %>% 
+  mutate(
+    prop_tests = map2(.x = hom_unsolved, .y = hom_total, ~prop.test(x = .x, n = .y)),
+    tidy_tests = map(.x = prop_tests, ~broom::tidy(.x))
+  ) %>% 
+  select(-prop_tests) %>% 
+  unnest(tidy_tests) %>% 
+  select(city_state, estimate, conf.low, conf.high)
+```
+
+
+```{r}
+results_df %>% 
+  mutate(city_state = fct_reorder(city_state, estimate)) %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() + 
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high))
+```
+
+## Problem 2 ideas ... 
+
+Import one dataset
+
+```{r}
+data_1 = read_csv("./lda_data/con_01.csv")
+```
+
+```{r}
+path_df = 
+  tibble(
+    path = list.files("lda_data")
+  ) %>% 
+  mutate(
+    path = str_c("lda_data/", path),
+    )
+
+read_csv(path_df$path[[1]])
+```
+
+
+
