@@ -7,6 +7,7 @@ output: github_document
 ```{r}
 library(tidyverse)
 library(rvest)
+library(ggplot2)
 
 knitr::opts_chunk$set(
   fig.width = 6,
@@ -108,10 +109,28 @@ path_df =
   ) %>% 
   mutate(
     path = str_c("lda_data/", path),
+    data = purrr::map(path, read_csv)
+    ) %>% 
+  unnest(data) %>% 
+  separate(
+    path,
+    into = c("file1", "file2", "trt_arm", "id", NA)
+  ) %>% 
+  select(-file1, -file2) %>% 
+  pivot_longer(
+    week_1:week_8,
+    names_to = "week",
+    values_to = "obs"
+  ) %>% 
+  mutate(
+    week = as.numeric(sub(".*_", "", week))
     )
-
-read_csv(path_df$path[[1]])
 ```
 
-
+```{r}
+path_df %>% 
+  ggplot(aes(x = week, y = obs, group = id, color = id)) +
+  geom_smooth(se = FALSE) +
+  facet_grid(. ~ trt_arm)
+```
 
