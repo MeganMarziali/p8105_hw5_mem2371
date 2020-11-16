@@ -4,10 +4,11 @@ author: Megan Marziali
 output: github_document
 ---
 
-```{r}
+```{r, message = FALSE}
 library(tidyverse)
 library(rvest)
 library(ggplot2)
+library(patchwork)
 
 knitr::opts_chunk$set(
   fig.width = 6,
@@ -32,11 +33,15 @@ set.seed(1)
 
 Read in the data.
 
-```{r}
-homicides_df = 
+```{r, message = FALSE, warning = FALSE}
+homicides_df_orig = 
   read_csv("./data/homicides.csv",
            na = "") %>% 
   janitor::clean_names() %>% 
+  mutate(victim_age = as.numeric(victim_age))
+
+homicides_df = 
+  homicides_df_orig %>% 
   mutate(
     resolved = case_when(
       disposition == "Closed without arrest" ~ "unsolved",
@@ -50,11 +55,13 @@ homicides_df =
   filter(city_state != "Tulsa_AL")
 ```
 
-The Washington Post data on homicides in 50 large US cities contains `r nrow(homicides_df)` rows and `r ncol(homicides_df)` variables (including the city_state and new date variables, which has been constructed in the above code). The data contains important information regarding homicides, such as the victim's first and last name, race, age, sex, location of incident (including city and state), and the status of the case.
+The Washington Post data on homicides in 50 large US cities contains `r nrow(homicides_df_orig)` rows and `r ncol(homicides_df_orig)` variables, with `r variable.names(homicides_df_orig)`. The data contains important information regarding homicides, such as the victim's first and last name, race, age, sex, location of incident (including city and state), and the status of the case. The age range of victims is from `r min(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)` years (suggesting missing data), to `r max(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)` years, with a mean of `r mean(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)` (SD = `r sd(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)`) and median of `r median(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)` (IQR: `r IQR(pull(homicides_df_orig, var = victim_age), na.rm = TRUE)`).
 
-Let's look at this a bit
+The manipulated Washington Post data contains `r nrow(homicides_df)` rows and `r ncol(homicides_df)` variables. This includes `r variable.names(homicides_df)`. 
 
-```{r}
+Let's look at this a bit more.
+
+```{r, message = FALSE, warning = FALSE}
 aggregate_df = 
   homicides_df %>% 
   group_by(city_state) %>% 
@@ -64,18 +71,18 @@ aggregate_df =
   )
 ```
 
-Can I do a prop test for a single city?
+Doing a prop test for a single city.
 
-```{r}
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
 prop.test(
   aggregate_df %>% filter(city_state == "Baltimore_MD") %>%  pull(hom_unsolved),
   aggregate_df %>% filter(city_state == "Baltimore_MD") %>%  pull(hom_total)) %>% 
   broom::tidy()
 ```
 
-Try to iterate ...
+Trying to iterate:
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 results_df = 
   aggregate_df %>% 
   mutate(
@@ -88,23 +95,26 @@ results_df =
 ```
 
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 results_df %>% 
   mutate(city_state = fct_reorder(city_state, estimate)) %>% 
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point() + 
-  geom_errorbar(aes(ymin = conf.low, ymax = conf.high))
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
-## Problem 2 ideas ... 
+## Problem 2 ideas 
 
-Import one dataset
+Importing initial dataset.
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 data_1 = read_csv("./lda_data/con_01.csv")
 ```
 
-```{r}
+Creating code to import all datasets, clean data.
+
+```{r, message = FALSE, warning = FALSE}
 path_df = 
   tibble(
     path = list.files("lda_data")
@@ -129,16 +139,20 @@ path_df =
     )
 ```
 
-```{r}
+Creation of a spaghetti plot.
+
+```{r, message = FALSE, warning = FALSE}
 path_df %>% 
   ggplot(aes(x = week, y = obs, group = id, color = id)) +
-  geom_smooth(se = FALSE) +
-  facet_grid(. ~ trt_arm)
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = lm, se = FALSE) +
+  facet_grid(. ~ trt_arm) +
+  labs(y = "Observations", x = "Week", title = "Observations over time for the \ncontrol and experimental treatment arms")
 ```
 
 ## Problem 3
 
-Need to simulate a sample and conduct a t-test within the function. Then, combine this function with a map statement. The following code is to build the initial function, and make sure it works when setting mu = 0.
+The following code is to build the initial function, and make sure it works when setting mu = 0.
 
 ```{r}
 sim_ttest2 = function(samp_size = 30, mu, sigma = 5) {
@@ -154,13 +168,7 @@ sim_ttest2 = function(samp_size = 30, mu, sigma = 5) {
 }
 
 sim_results = 
-  rerun(10, sim_ttest2(mu = 0)) %>% 
-  bind_rows()
-```
-
-```{r}
-sim_results = 
-  rerun(10, sim_ttest2(mu = 0)) %>% 
+  rerun(5000, sim_ttest2(mu = 0)) %>% 
   bind_rows()
 ```
 
@@ -172,7 +180,7 @@ sim_tres =
   mu = c(0, 1, 2, 3, 4, 5, 6)
   ) %>% 
   mutate(
-    output_lists = map(.x = mu, ~ rerun(10, sim_ttest2(mu = .x))),
+    output_lists = map(.x = mu, ~ rerun(5000, sim_ttest2(mu = .x))),
     estimate_df = map(output_lists, bind_rows)
   ) %>% 
   select(-output_lists) %>% 
@@ -186,11 +194,11 @@ sim_tres =
       ))
 ```
 
-### Plot 1
+#### Plot 1
 
 The plot below illustrates power and the true value of mu.
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 sim_prop = 
   sim_tres %>% 
   group_by(mu, rejected) %>% 
@@ -198,45 +206,47 @@ sim_prop =
   summarise(
     count = n()) %>% 
   mutate(
-    prop = count / 10
+    prop = count / 5000
   )
   
 sim_prop %>% 
   ggplot(aes(x = mu, y = prop)) +
-  geom_point()
+  geom_point() +
+  labs(y = "Proportion of times null rejected", x = "True value of mu", title = "Power and true value of mu")
 ```
 
-## Plot 2
+From this plot, we can see that as the true value of mu increases, power increases and levels off around 1.0 (which is maximum power).
+
+#### Plot 2
 
 The plot below illustrates the average estimate of mu on the x-axis, and the true value of mu on the y-axis.
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 sim_avg = 
   sim_tres %>%
   group_by(mu) %>%
   summarize(
     mu_avg = mean(mu_hat)
-  )
-
-sim_avg %>% 
+  ) %>% 
   ggplot(aes(x = mu, y = mu_avg)) +
-  geom_point()
+  geom_point() + geom_smooth(method = lm, se = FALSE) +
+  labs(y = "True value of mu", x = "Average of sample mu", title = "True value of mu and mu average")
 ```
 
-## Plot 3
+The plot below illustrates the average estimate of mu on the x-axis within samples where the null was rejected, and the true value of mu on the y-axis. The two plots have been patched together.
 
-The plot below illustrates the average estimate of mu on the x-axis within samples where the null was rejected, and the true value of mu on the y-axis.
-
-```{r}
+```{r, message = FALSE, warning = FALSE}
 sim_avg_rej = 
   sim_tres %>%
   group_by(mu) %>%
-  filter(rejected == "no") %>% 
+  filter(rejected == "yes") %>% 
   summarize(
-    mu_avg_rej = mean(mu_hat))
-
-sim_avg_rej %>% 
+    mu_avg_rej = mean(mu_hat)) %>% 
   ggplot(aes(x = mu, y = mu_avg_rej)) +
-  geom_point()
+  geom_point() + geom_smooth(method = lm, se = FALSE) +
+  labs(y = "True value of mu", x = "Average of sample mu", title = "True value of mu and mu average among samples where null was rejected")
+
+sim_avg / sim_avg_rej
 ```
 
+As can be viewed from the above plots, the same average of mu is approximately equal to the true value of mu among samples where null is rejected at greater values of mu. At lower values, there is some variation between average sample mu and true value of mu among samples where the null was rejected. This is reasonable, as with higher values of mu, there is a greater likelihood that the power will be sufficient to reject the null.
