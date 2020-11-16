@@ -24,6 +24,8 @@ options(
 
 scale_colour_discrete = scale_color_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
+
+set.seed(1)
 ```
 
 ## Problem 1
@@ -136,7 +138,7 @@ path_df %>%
 
 ## Problem 3
 
-Need to simulate a sample and conduct a t-test within the function. Then, combine this function with a map statement.
+Need to simulate a sample and conduct a t-test within the function. Then, combine this function with a map statement. The following code is to build the initial function, and make sure it works when setting mu = 0.
 
 ```{r}
 sim_ttest2 = function(samp_size = 30, mu, sigma = 5) {
@@ -162,6 +164,8 @@ sim_results =
   bind_rows()
 ```
 
+The next code chunk sets mu as 0:6, to create a finalized dataset.
+
 ```{r}
 sim_tres = 
   tibble(
@@ -172,20 +176,50 @@ sim_tres =
     estimate_df = map(output_lists, bind_rows)
   ) %>% 
   select(-output_lists) %>% 
-  unnest(estimate_df)
-```
-
-### Plotting
-
-```{r}
-sim_ttest %>%
+  unnest(estimate_df) %>% 
+  rename(mu_hat = estimate) %>% 
+  select(mu, mu_hat, p.value) %>% 
   mutate(
     rejected = case_when(
       p.value <= 0.05 ~ "yes",
       p.value > 0.05  ~ "no"
-      )
-  ) %>% 
-  ggplot(aes(x = sample_size, y = mean)) +
-  geom_boxplot()
+      ))
+```
+
+### Plot 1
+
+The plot below illustrates power and the true value of mu.
+
+```{r}
+sim_prop = 
+  sim_tres %>% 
+  group_by(mu, rejected) %>% 
+  filter(rejected == "yes") %>% 
+  summarise(
+    count = n()) %>% 
+  mutate(
+    prop = count / 10
+  )
+  
+sim_prop %>% 
+  ggplot(aes(x = mu, y = prop)) +
+  geom_point()
+```
+
+## Plot 2
+
+The plot below illustrates the average estimate of mu\hat on the x-axis, and the true value of mu on the y-axis.
+
+```{r}
+sim_avg = 
+  sim_tres %>%
+  group_by(mu) %>%
+  summarize(
+    mu_avg = sum(mu_hat) / 10
+  )
+
+sim_avg %>% 
+  ggplot(aes(x = mu, y = mu_avg)) +
+  geom_point()
 ```
 
