@@ -208,18 +208,35 @@ sim_prop %>%
 
 ## Plot 2
 
-The plot below illustrates the average estimate of mu\hat on the x-axis, and the true value of mu on the y-axis.
+The plot below illustrates the average estimate of mu on the x-axis, and the true value of mu on the y-axis.
 
 ```{r}
 sim_avg = 
   sim_tres %>%
   group_by(mu) %>%
   summarize(
-    mu_avg = sum(mu_hat) / 10
+    mu_avg = mean(mu_hat)
   )
 
 sim_avg %>% 
   ggplot(aes(x = mu, y = mu_avg)) +
+  geom_point()
+```
+
+## Plot 3
+
+The plot below illustrates the average estimate of mu on the x-axis within samples where the null was rejected, and the true value of mu on the y-axis.
+
+```{r}
+sim_avg_rej = 
+  sim_tres %>%
+  group_by(mu) %>%
+  filter(rejected == "no") %>% 
+  summarize(
+    mu_avg_rej = mean(mu_hat))
+
+sim_avg_rej %>% 
+  ggplot(aes(x = mu, y = mu_avg_rej)) +
   geom_point()
 ```
 
